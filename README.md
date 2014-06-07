@@ -2,7 +2,9 @@ BeanCube 1.0
 ============
 
 Chris Gregg
+
 June 2014
+
 tofergregg@gmail.com
 
 Overview
@@ -21,7 +23,7 @@ browser web page running JavaScript and websockets.
 Requirements
 ------------
 
-1. LightBlue Bean
+1. LightBlue Bean (http://punchthrough.com/bean/)
 2. BeanLoader (see http://punchthrough.com/bean/getting-started/)
 3. Arduino IDE
 4. pywebsocket python integration (https://code.google.com/p/pywebsocket/)

@@ -71,4 +71,13 @@ demonstrating the use of the 3-axis accelerometer.
 There is a demo game as well -- push "Play Game" to try it out, and follow the
 directions. It is harder than it looks!
 
+Demo Videos
+-----------
+
+How to run the demo:
+http://youtu.be/LxICe2TMLss
+
+The Bean controlling the browser cubes:
+http://youtu.be/WI5TF9vgKIQ
+
 

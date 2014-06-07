@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<!--
+LightBlue Bean web interface demonstration.
+By Chris Gregg, June 2014
+
+Acknowledgements: Javascript / HTML code for the rotating cube was
+found here: http://codentronix.com/2011/05/10/html5-experiment-a-rotating-solid-cube/
+-->
+
+<html>
+<head>
+	<title>HTML5 Experiment: A Rotating Solid Cube</title>
+</head>
+ 	<script type="text/javascript">
+	window.onload = init;
+	function init() {
+		playGame.playing = false; // not yet playing a game
+		init.Cubes = Cubes();
+		
+		canvas = document.getElementById("thecanvas");
+		if( canvas && canvas.getContext ) {
+				ctx = canvas.getContext("2d");
+			}
+		init.Cubes.rotate(0,0,0);
+		
+		// set up webSocket
+		ws = new WebSocket("ws://localhost:8880/beanCube");
+		ws.onopen = function(){
+			alert("websocket opened.");
+		}
+		ws.onclose = function(){
+			alert("websocket closed.");
+			if (init.getDataInterval != "undefined") {
+				clearInterval(init.getDataInterval);
+			}
+		}
+		ws.onmessage = function(e) {
+			//console.log(e.data);
+			var accelData = e.data.split(',');
+			
+			xRaw = accelData[0];
+			yRaw = accelData[1];
+			zRaw = accelData[2];
+			
+			r = Math.sqrt(xRaw*xRaw + yRaw*yRaw + zRaw*zRaw);
+			
+			xAngle = parseInt(Math.acos(xRaw / r)*33)-50;
+			yAngle = parseInt(Math.acos(yRaw / r)*33)-50;
+			zAngle = parseInt(Math.acos(zRaw / r)*33)-50;
+			
+			// rotate the cubes
+			
+			init.Cubes.rotate(xAngle,yAngle,zAngle);
+			
+			//console.log(xAngle+","+yAngle+","+zAngle);
+		}
+		init.getDataInterval = setInterval(getAccelData,100);
+	}
+	function Cubes(){
+		var cubes = new Object();
+		cubes.all = [];
+		
+		cubes.axes = ['x','y','z'];
+
+		cubes.all.push(Cube(0,'x'));
+		cubes.all.push(Cube(1,'y'));
+		cubes.all.push(Cube(2,'z'));
+		
+		cubes.rotate = function(xAngle,yAngle,zAngle) {
+			allSolved = true; // maybe
+			for (i=0;i<cubes.all.length;i++) {
+				cubes.all[i].rotate(xAngle,yAngle,zAngle);
+				if (!cubes.all[i].solved) allSolved = false;
+			}
+			if (playGame.playing && allSolved) {
+				alert("Winner!");
+				playGame.playing = false; // stop playing
+				clearInterval(gameLoop.interval);
+			}
+		}
+		cubes.shiftAxes = function() {
+			cubes.axes.push(cubes.axes.shift())
+			for (i=0;i<cubes.all.length;i++) {
+				cubes.all[i].axis = cubes.axes[i];
+			}
+		}
+		cubes.checkForSolved = function(){
+			threshold = 5;
+			for (i=0;i<cubes.all.length;i++) {
+				cubes.all[i].checkForSolved(threshold);
+			}
+		}
+		return cubes;
+	}
+	function Cube(num,axis){
+		var cube = new Object();
+		cube.num = num;
+		cube.axis = axis;
+		
+		cube.x = 0;
+		cube.y = 0;
+		cube.z = 0;
+		
+		cube.solved = false; // not in the proper position yet
+		
+		cube.rotate = function(xAngle,yAngle,zAngle) {
+			threshold = 5;
+			if (cube.solved) return; // don't rotate if solved
+			if (cube.axis == 'x') {
+				cube.x = (cube.x + xAngle) % 360;
+				if (cube.x < 0) cube.x += 360;
+			}
+			else if (cube.axis == 'y') {
+				cube.y = (cube.y + yAngle) % 360;
+				if (cube.y < 0) cube.y += 360;
+			}
+			else if (cube.axis == 'z') {
+				cube.z = (cube.z + zAngle) % 360;
+				if (cube.z < 0) cube.z += 360;
+			}
+			rotateCube(cube.x,cube.y,cube.z,cube.num);
+			if (playGame.playing) {
+				solveCheck = cube.checkForSolved(threshold);
+				console.log(solveCheck+","+colors.indexOf(playGame.randColors[cube.num])+","+
+					cube.num);
+				if (cube.checkForSolved(threshold) == 
+					colors.indexOf(playGame.randColors[cube.num])) {
+						cube.solved = true;
+						writeCurrentAxis(cube.num,"Solved!");
+						return;
+				}
+			}
+			writeCurrentAxis(cube.num,cube.axis)
+			//console.log(cube.x+","+cube.y+","+cube.z+","+cube.num);
+		}
+		cube.absoluteRotate = function(xAngle,yAngle,zAngle) {
+			rotateCube(xAngle,yAngle,zAngle,cube.num);
+			cube.x = xAngle;
+			cube.y = yAngle;
+			cube.z = zAngle;
+			cube.checkForSolved(5);
+		}
+		cube.normal = function(a,b){
+			
+		}
+		cube.checkForSolved = function(threshold){
+			//console.log(cube.x+","+cube.y+","+cube.z+","+cube.num);
+
+			if (Math.abs(cube.y-270) < threshold) {
+				return(colorNames.indexOf("salmon"));
+				console.log("salmon,"+cube.num);
+			}
+			else if (Math.abs(cube.y-90) < threshold) {
+				return(colorNames.indexOf("dark blue"));
+				console.log("dark blue,"+cube.num);
+			}
+			else if (cube.x < threshold || cube.x > 360-threshold) {
+				if (cube.y < threshold || cube.y > 360-threshold) {
+					return(colorNames.indexOf("magenta"));
+					console.log("magenta,"+cube.num);
+				}
+				else if (Math.abs(cube.y-180) < threshold) {
+					return(colorNames.indexOf("green"));
+					console.log("green,"+cube.num);
+				}
+			}
+			else if (Math.abs(cube.x-180) < threshold) {
+				if (cube.y < threshold || cube.y > 360-threshold) {
+					return(colorNames.indexOf("green"));
+					console.log("green,"+cube.num);
+				}
+				else if (Math.abs(cube.y-180) < threshold) {
+					return(colorNames.indexOf("magenta"));
+					console.log("magenta,"+cube.num);
+				}
+			}
+			else if (Math.abs(cube.x-90) < threshold) {
+				if (cube.y < threshold || cube.y > 360-threshold) {
+					return(colorNames.indexOf("light blue"));
+					console.log("light blue,"+cube.num);
+				}
+				else if (Math.abs(cube.y-180) < threshold) {
+					return(colorNames.indexOf("purple"));
+					console.log("purple,"+cube.num);
+				}
+			}
+			else if (Math.abs(cube.x-270) < threshold) {
+				if (cube.y < threshold || cube.y > 360-threshold) {
+					return(colorNames.indexOf("purple"));
+					console.log("purple,"+cube.num);
+				}
+				else if (Math.abs(cube.y-180) < threshold) {
+					return(colorNames.indexOf("light blue"));
+					console.log("light blue,"+cube.num);
+				}
+			}
+			return -1; // no face
+		}
+		cube.checkFrontColor = function(){
+			var cubeSide = 400/3.; // hack for now
+			var nextCubeDist = 200; //     "
+			var imageData = ctx.getImageData(cubeSide+nextCubeDist*cube.num,
+							cubeSide,cubeSide,cubeSide);
+			// get average of the colors
+			colorAvg = 0;
+			for(i=0;i<imageData.data.length;i+=4) {
+					colorAvg+=(imageData.data[i]<<16)+
+						(imageData.data[i+1]<<8)+
+						imageData.data[i+2];
+			}
+			colorAvg = colorAvg / (imageData.height * imageData.width);
+			console.log(colorAvg);
+		}
+		return cube;
+	}
+
+	function getAccelData(){
+		ws.send("r"); // ask for data
+	}
+
+	function Point3D(x,y,z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+ 
+		this.rotateX = function(angle) {
+			var rad, cosa, sina, y, z
+			rad = angle * Math.PI / 180
+			cosa = Math.cos(rad)
+			sina = Math.sin(rad)
+			y = this.y * cosa - this.z * sina
+			z = this.y * sina + this.z * cosa
+			return new Point3D(this.x, y, z)
+		}
+ 
+		this.rotateY = function(angle) {
+			var rad, cosa, sina, x, z
+			rad = angle * Math.PI / 180
+			cosa = Math.cos(rad)
+			sina = Math.sin(rad)
+			z = this.z * cosa - this.x * sina
+			x = this.z * sina + this.x * cosa
+			return new Point3D(x,this.y, z)
+		}
+ 
+		this.rotateZ = function(angle) {
+			var rad, cosa, sina, x, y
+			rad = angle * Math.PI / 180
+			cosa = Math.cos(rad)
+			sina = Math.sin(rad)
+			x = this.x * cosa - this.y * sina
+			y = this.x * sina + this.y * cosa
+			return new Point3D(x, y, this.z)
+		}
+ 
+		this.project = function(viewWidth, viewHeight, fov, viewDistance) {
+			var factor, x, y
+			factor = fov / (viewDistance + this.z)
+			x = this.x * factor + viewWidth / 2
+			y = this.y * factor + viewHeight / 2
+			return new Point3D(x, y, this.z)
+		}
+	}
+ 
+	var vertices = [
+		new Point3D(-1,1,-1),
+		new Point3D(1,1,-1),
+		new Point3D(1,-1,-1),
+		new Point3D(-1,-1,-1),
+		new Point3D(-1,1,1),
+		new Point3D(1,1,1),
+		new Point3D(1,-1,1),
+		new Point3D(-1,-1,1)
+	];
+ 
+	// Define the vertices that compose each of the 6 faces. These numbers are
+	// indices to the vertex list defined above.
+	var faces  = [[0,1,2,3],[1,5,6,2],[5,4,7,6],[4,0,3,7],[0,4,5,1],[3,2,6,7]];
+ 
+	// Define the colors for each face.
+	colors = [[253,87,196],[80,145,201],[202,253,104],[253,193,199],[201,148,252],[80,146,252]];
+	colorNames = ['magenta','dark blue','green','salmon','purple','light blue'];
+ 
+	var angle = 0;
+ 
+	/* Constructs a CSS RGB value from an array of 3 elements. */
+	function arrayToRGB(arr) {
+		if( arr.length == 3 ) {
+			return "rgb(" + arr[0] + "," + arr[1] + "," + arr[2] + ")";
+		}
+		return "rgb(0,0,0)";
+	}
+ 
+	function rotateCube(xAngle,yAngle,zAngle,cubeNum) {
+		var t = new Array();
+		w = 200;
+ 
+		ctx.fillStyle = "rgb(255,255,255)";
+		ctx.fillRect(100+cubeNum*w,80,200,250);
+ 
+		for( var i = 0; i < vertices.length; i++ ) {
+			var v = vertices[i];
+			var r = v.rotateX(xAngle).rotateY(yAngle).rotateZ(zAngle);
+			//console.log(r);
+			//console.log(cubeNum);
+			var p = r.project(400,400,200,4);
+			t.push(p)
+		}
+ 
+		var avg_z = new Array();
+ 
+		for( var i = 0; i < faces.length; i++ ) {
+			var f = faces[i];
+			avg_z[i] = {"index":i, "z":(t[f[0]].z + t[f[1]].z + t[f[2]].z + t[f[3]].z) / 4.0};
+		}
+ 
+		avg_z.sort(function(a,b) {
+			return b.z - a.z;
+		});
+ 
+		for( var i = 0; i < faces.length; i++ ) {
+			var f = faces[avg_z[i].index]
+ 
+			ctx.fillStyle = arrayToRGB(colors[avg_z[i].index]);
+			ctx.beginPath()
+			ctx.moveTo(t[f[0]].x+cubeNum*w,t[f[0]].y)
+			ctx.lineTo(t[f[1]].x+cubeNum*w,t[f[1]].y)
+			ctx.lineTo(t[f[2]].x+cubeNum*w,t[f[2]].y)
+			ctx.lineTo(t[f[3]].x+cubeNum*w,t[f[3]].y)
+			ctx.closePath()
+			ctx.fill()
+			//console.log(t[f[0]].x+cubeNum*w+","+t[f[0]].y+","+cubeNum)
+		}
+	}
+	function playGame(){
+		// display instructions
+		gameText("Rotate each cube to match the color.");
+			
+		// set up color boxes
+		// get three random colors
+		playGame.randColors = []
+		for (i=0;i<3;i++) {
+			playGame.randColors.push(colors[Math.floor((Math.random() * 6))]);
+		}
+		colorBoxesSpan = document.getElementById("colorBoxes");
+		for (i=0;i<3;i++) {
+			square(185+i*200,30,30,30,playGame.randColors[i]);
+		}
+		playGame.playing = true; // game on!
+		gameLoop.interval = setInterval(gameLoop,1000);
+		
+		// no complete cubes yet
+		gameLoop.aComplete = false;
+		gameLoop.bComplete = false;
+		gameLoop.cComplete = false;
+		
+		gameLoop.ticks = 0;
+	}
+	function gameLoop(){
+		//console.log("tick");
+		gameLoop.ticks += 1;
+		// basic idea: always have at least one cube rotating
+		// but sometimes have two or three rotating
+		// lock in cube when it is in the proper orientation (or close enough)
+		// 
+		// different basic idea:
+		// have each cube rotate through x,y,z continuously. Lock in cube
+		// when it is in the proper orientation (or close enough)
+		if (gameLoop.ticks % 5 == 0) init.Cubes.shiftAxes();
+		
+	}
+	function gameText(text){
+		var canvas = document.getElementById('thecanvas');
+		var context = canvas.getContext('2d');
+
+		context.font = '20pt Calibri';
+		context.fillStyle = 'blue';
+		context.fillText(text, 250, 20);
+	}
+	function square(x,y,w,h,colorRgb) {
+		color = "rgb("+colorRgb[0]+","+colorRgb[1]+","+colorRgb[2]+")";
+		var canvas = document.getElementById('thecanvas');
+		var context = canvas.getContext('2d');
+
+		context.beginPath();
+		context.rect(x, y, w, h);
+		context.fillStyle = color;
+		context.fill();
+		context.lineWidth = 0;
+		context.strokeStyle = color;
+		context.stroke();
+	}
+
+	function writeCurrentAxis(cubeNum,axis) {
+		var canvas = document.getElementById('thecanvas');
+		var context = canvas.getContext('2d');
+
+		context.clearRect(190+cubeNum*200,330,20,20);
+		context.font = '20pt Calibri';
+		context.fillStyle = 'black';
+		context.fillText(axis, 195+cubeNum*200, 330);
+	}
+	function allAngles() {
+		for (x=0;x<360;x+=45) {
+			for (y=0;y<360;y+=45) {
+				for (z=0;z<360;z+=45) {
+					init.Cubes.all[0].absoluteRotate(x,y,z);
+					alert(x+","+y+","+z);
+				}
+			}
+		}
+	}
+	</script>
+
+<style TYPE="text/css" MEDIA=screen> 
+<!-- 
+.colorBox{
+    float:left;
+    height:20px;
+    width:20px;
+    border:5px solid white;
+} 
+--> 
+</style> 
+
+<body>
+	<input type="button" id="gameButton" value="Play Game" onclick="playGame()">
+	<p>
+	<div id="gameDiv"></div>
+	<span id="instructions"></span>
+	<p>
+	<span id="colorBoxes"></span>
+	<p>
+	<canvas id="thecanvas" width="800" height="350">
+		Your browser does not support the HTML5 canvas element. <a href=#>Click here</a> to watch the video.
+	</canvas>
+</body>
+</html>
